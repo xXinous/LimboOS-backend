@@ -1,0 +1,1 @@
+const E={1:"RESTRITO",2:"CONFIDENCIAL",3:"SIGILOSO",4:"TOP SECRET"};export{E as A};
