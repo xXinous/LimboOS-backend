@@ -5,7 +5,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 initializeApp();
 
-const ADMIN_EMAIL = "gm.mpg@runningman.local";
+const ADMIN_UID = "5TZK6YHmOOTe5padFPqCbXuavPu1";
 
 /**
  * adminResetPassword — allows the admin to change any user's password.
@@ -23,7 +23,7 @@ exports.adminResetPassword = onCall(
     }
 
     // 2. Verify caller is the admin
-    if (request.auth.token.email !== ADMIN_EMAIL) {
+    if (request.auth.uid !== ADMIN_UID) {
       throw new HttpsError(
         "permission-denied",
         "Apenas o administrador pode alterar senhas."

@@ -13,19 +13,26 @@ service firebase.storage {
 
     // Function to check if the user is the admin
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == "gm.mpg@runningman.local";
+      return isAuthenticated() && request.auth.uid == "5TZK6YHmOOTe5padFPqCbXuavPu1";
     }
 
     match /profilePhotos/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    match /{allPaths=**} {
-      // Anyone authenticated can read/download the audios
+    match /audios/{allPaths=**} {
       allow read: if isAuthenticated();
-      
-      // ONLY the admin can upload, modify, or delete files. 
-      // This protects against malicious file uploads and DDOS via storage exhaustion by malicious users.
+      allow write: if isAdmin();
+    }
+
+    match /mediaAssets/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read: if isAdmin();
       allow write: if isAdmin();
     }
   }

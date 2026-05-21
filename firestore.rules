@@ -6,7 +6,7 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == "gm.mpg@runningman.local";
+      return isAuthenticated() && request.auth.uid == "5TZK6YHmOOTe5padFPqCbXuavPu1";
     }
     function isOwner(uid) {
       return isAuthenticated() && request.auth.uid == uid;
@@ -124,12 +124,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /mediaAssets/{assetId} {
-      allow read, write: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     match /playEvents/{eventId} {
       allow read: if isAdmin();
       allow create: if isOwner(request.resource.data.uid) && isValidPayloadSize();
-      allow update, delete: if isAdmin();
+      allow update: if isOwner(resource.data.uid) || isAdmin();
+      allow delete: if isAdmin();
     }
     match /activityLog/{logId} {
       allow read: if isAdmin();
