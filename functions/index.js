@@ -1,29 +1,27 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 initializeApp();
 
 const ADMIN_UID = "5TZK6YHmOOTe5padFPqCbXuavPu1";
+const REGION = "southamerica-east1";
 
 /**
  * adminResetPassword — allows the admin to change any user's password.
- *
- * Callable from the client with:
- *   const fn = httpsCallable(functions, 'adminResetPassword');
- *   await fn({ targetUid, newPassword });
  */
 exports.adminResetPassword = onCall(
-  { region: "southamerica-east1" },
+  { region: REGION },
   async (request) => {
     // 1. Verify caller is authenticated
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Autenticação necessária.");
     }
 
-    // 2. Verify caller is the admin
-    if (request.auth.uid !== ADMIN_UID) {
+    // 2. Verify caller is the admin (via custom claim or hardcoded UID)
+    if (request.auth.token.admin !== true && request.auth.uid !== ADMIN_UID) {
       throw new HttpsError(
         "permission-denied",
         "Apenas o administrador pode alterar senhas."
@@ -76,6 +74,67 @@ exports.adminResetPassword = onCall(
         "internal",
         `Falha ao alterar senha: ${error.message}`
       );
+    }
+  }
+);
+
+/**
+ * aggregatePlayEvent — Updates system/analytics when a new play event is recorded.
+ */
+exports.aggregatePlayEvent = onDocumentCreated(
+  { 
+    document: "playEvents/{eventId}",
+    region: REGION 
+  },
+  async (event) => {
+    const data = event.data.data();
+    if (!data) return;
+
+    const db = getFirestore();
+    const analyticsRef = db.doc("system/analytics");
+
+    const playedAt = data.playedAt ? data.playedAt.toDate() : new Date();
+    const dateKey = playedAt.toISOString().slice(0, 10);
+    const tapeId = data.tapeId || "unknown";
+
+    const updateData = {
+      totalPlays: FieldValue.increment(1),
+      [`dailyPlays.${dateKey}`]: FieldValue.increment(1),
+      [`tapePlayCount.${tapeId}`]: FieldValue.increment(1),
+      lastUpdatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (data.completed) {
+      updateData.completedPlays = FieldValue.increment(1);
+    }
+
+    try {
+      await analyticsRef.set(updateData, { merge: true });
+    } catch (err) {
+      console.error("Error updating analytics aggregation:", err);
+    }
+  }
+);
+
+/**
+ * aggregateUserCreation — Updates total user count in system/analytics.
+ */
+exports.aggregateUserCreation = onDocumentCreated(
+  { 
+    document: "users/{userId}",
+    region: REGION 
+  },
+  async (event) => {
+    const db = getFirestore();
+    const analyticsRef = db.doc("system/analytics");
+
+    try {
+      await analyticsRef.set({
+        totalUsers: FieldValue.increment(1),
+        lastUpdatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error updating user count aggregation:", err);
     }
   }
 );
